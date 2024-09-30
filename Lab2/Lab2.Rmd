@@ -319,6 +319,13 @@ region <- read_html("https://uk.wikipedia.org/wiki/%D0%86%D1%81%D1%82%D0%BE%D1%8
   html_element(xpath = '//*[@id="mw-content-text"]/div[1]/table[5]') |>
   html_table() |> gather(рік, населення, `1926`:`2014`) |> subset(grepl("область", регіон))
 
+region <- region |> spread(key = регіон, value = населення) |> 
+  arrange(desc(row_number())) |> 
+  fill(`Вінницька область`:`Чернігівська область`) |> 
+  arrange(desc(row_number())) |> 
+  gather(регіон, населення, `Вінницька область`:`Чернігівська область`)
+
+
 region |> 
   ggplot(aes(рік, населення)) +
   geom_line(aes(group = регіон), colour = "white") + 
