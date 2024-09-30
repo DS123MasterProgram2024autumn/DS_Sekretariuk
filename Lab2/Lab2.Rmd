@@ -286,7 +286,79 @@ starwars %>%
 
 ### Індивідуальні завдання на лабораторну роботу
 
+####Динаміку зміни населення України за роками
+
+```{r}
+
+library(rio)
+library(tidyr)
+library(ggplot2)
+
+db <- import("data/ukrpopl.csv")
+country <- db |> 
+  select("Country Name", "1990 [YR1990]":"2023 [YR2023]") |> 
+  gather("1990 [YR1990]":"2023 [YR2023]", key = "year", value = "population")
+country$year <- substr(country$year, 9, nchar(country$year)-1) |> 
+  as.numeric()
+
+country |> 
+  filter(`Country Name` == "Ukraine") |> 
+  ggplot(aes(year, population)) +
+  geom_line(aes(group = `Country Name`), colour = "white") + 
+  geom_point(aes(colour = `Country Name`))+
+  theme_dark()
+```
+
+####Динаміку зміни населення України по кожній області окремо за роками
+
+```{r}
+library(tidyverse)
+library(rvest)
+
+region <- read_html("https://uk.wikipedia.org/wiki/%D0%86%D1%81%D1%82%D0%BE%D1%80%D0%B8%D1%87%D0%BD%D0%B0_%D0%B4%D0%B5%D0%BC%D0%BE%D0%B3%D1%80%D0%B0%D1%84%D1%96%D1%8F_%D0%A3%D0%BA%D1%80%D0%B0%D1%97%D0%BD%D0%B8") |> 
+  html_element(xpath = '//*[@id="mw-content-text"]/div[1]/table[5]') |>
+  html_table() |> gather(рік, населення, `1926`:`2014`) |> subset(grepl("область", регіон))
+
+region |> 
+  ggplot(aes(рік, населення)) +
+  geom_line(aes(group = регіон), colour = "white") + 
+  geom_point(aes(colour = регіон))+
+  theme_dark()
 
 
+```
 
+####Динаміку зміни тривалості життя населення України по статі за роками
+
+```{r}
+
+lifetime <- read_html("https://uk.wikipedia.org/wiki/%D0%A2%D1%80%D0%B8%D0%B2%D0%B0%D0%BB%D1%96%D1%81%D1%82%D1%8C_%D0%B6%D0%B8%D1%82%D1%82%D1%8F_%D0%B2_%D0%A3%D0%BA%D1%80%D0%B0%D1%97%D0%BD%D1%96") |> 
+  html_element(xpath = '//*[@id="mw-content-text"]/div[1]/table[4]') |>
+  html_table() |> 
+  gather(Рік, "Тривалість життя", `1950`:`2019`)
+
+colnames(lifetime)[which(names(lifetime) == "")] <- "Стать"
+lifetime$`Тривалість життя` <- parse_number(lifetime$`Тривалість життя`, locale = locale(decimal_mark = ","))
+lifetime$`Рік` <- as.integer(lifetime$`Рік`)
+lifetime |> 
+  ggplot(aes(Рік, `Тривалість життя`)) +
+  geom_line(aes(group = Стать), colour = "white") + 
+  geom_point(aes(colour = Стать))+
+  theme_dark()
+```
+
+####Динаміку зміни народжуваності та смертності населення України за роками.
+
+```{r}
+birthdeath <- import("data/birthdeath.csv")
+
+birthdeath$DateTime <- substr(birthdeath$DateTime, start = 1, stop=4)
+colnames(birthdeath)[which(names(birthdeath) == "DateTime")] <- "Рік"
+birthdeath |> 
+  gather(Тип, Число, Народжених, Померлих) |> 
+  ggplot(aes(Рік, Число)) +
+  geom_line(aes(group = Тип), colour = "white") + 
+  geom_point(aes(colour = Тип))+
+  theme_dark()
+```
 
