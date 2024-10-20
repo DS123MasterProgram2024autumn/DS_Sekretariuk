@@ -1,0 +1,371 @@
+---
+title: "Лабораторна робота №2. Маніпулювання даними"
+author: "[Секретарюк В. О.](https://github.com/SquireUA), `r format(Sys.time(), '%Y')`"
+date: "`r Sys.Date()`"
+output:
+#   pdf_document:
+#     highlight: tango
+#     toc: yes
+#   word_document:
+#     highlight: tango
+#     toc: yes
+  html_notebook:
+    toc: yes # генерація змісту документу
+    toc_float: true
+    highlight: tango # Колір підсвічування коду
+fontsize: 12pt # розмір шрифту
+header-includes:
+ \usepackage[T2A]{fontenc}
+ \usepackage[utf8]{inputenc}
+editor_options: 
+  chunk_output_type: console # вивід результатів обчислень на консоль
+---
+
+__Мета:__ _Засвоєння принципів, знайомство з інструментами та набуття навичок експлораторного (розвідувального) аналізу даних засобами мови програмування R та колекції пакетів `dplyr`, `ggplot2`, `desctable`, `GGally`, `corrplot`, `PerformanceAnalytics`, `FactoMineR`, `factoextra`, `desctable`, `ade4`, `psych`, `smacof`, `WVPlots`, `caret`, `car`._ 
+
+### Імпорт даних
+
+```{r}
+# install_formats() #інсталяція додаткових компонентів пакету rio
+
+library(rio)
+df <- data.frame(x = 1:6, y = rnorm(6))
+
+export(df, "data/df_data_frame.txt")
+dfImp <- import("data/df_data_frame.txt")
+dfImp
+
+```
+
+```{r}
+
+data("mtcars") #підключення стандартного набору даних mtcars
+head(mtcars)
+export(head(mtcars), "data/mtcars.dta")
+convert('data/mtcars.dta', 'data/mtcars.csv')
+import("data/mtcars.csv")
+
+```
+
+#### Імпорт з реляційних баз даних
+
+```{r}
+#install.packages("dbplyr")
+#install.packages("RSQLite")
+
+library(dbplyr)
+library(dplyr)
+library(RSQLite)
+
+#my_db <- src_sqlite("data/my_db.sqlite3", create = T)
+#head(my_db)
+```
+
+```{r}
+#install.packages("nycflights13")
+library(nycflights13)
+#flights_sqlite <- copy_to(my_db, flights, temporary = FALSE, 
+#                           indexes = list(c("year", "month", "day"), "carrier", "tailnum"))
+#head(flights_sqlite)
+```
+
+```{r}
+con <- DBI::dbConnect(RSQLite::SQLite(), path = "data/my_db.sqlite3")
+flights_sqlite <- copy_to(con, nycflights13::flights, "flights",
+        temporary = FALSE, 
+        indexes = list(
+          c("year", "month", "day"), 
+          "carrier", 
+          "tailnum",
+          "dest"
+        )
+)
+
+head(flights_sqlite)
+```
+
+```{r}
+DBI::dbDisconnect(con)
+```
+
+### Приведення даних до охайного вигляду
+
+```{r}
+#install.packages("tidyverse")
+library(tidyverse)
+```
+
+```{r}
+# відносний критерій на 10000
+table1 %>%  # стандартний набір даних
+  mutate(rate = cases / population * 10000) # обчислення нового поля
+```
+
+```{r}
+# кількість випадків на рік
+table1 %>% 
+  count(year, wt = cases)
+```
+
+```{r}
+# Візуалізація динаміки зміни кількості випадків з часом
+library(ggplot2)
+ggplot(table1, aes(year, cases)) + 
+  geom_line(aes(group = country), colour = "white") + 
+  geom_point(aes(colour = country))+
+  theme_dark()
+```
+
+#### Завдання на самостійну роботу.
+
+Побудувати динаміку відносного критерію rate кількості захворювань по роках для кожної держави.
+
+```{r}
+table1 %>%  # стандартний набір даних
+  mutate(rate = cases / population * 10000) |> 
+  ggplot(aes(year, rate)) +
+  geom_line(aes(group = country), colour = "white") + 
+  geom_point(aes(colour = country))+
+  theme_dark()
+```
+
+### Gathering
+
+```{r}
+table4a
+```
+
+```{r}
+table4a %>% 
+  gather(`1999`, `2000`, key = "year", value = "cases")
+```
+
+```{r}
+tidy4a <- table4a %>% 
+  gather(`1999`, `2000`, key = "year", value = "cases")
+tidy4b <- table4b %>% 
+  gather(`1999`, `2000`, key = "year", value = "population")
+dplyr::left_join(tidy4a, tidy4b)
+```
+
+#### Завдання на самостійну роботу
+
+Виконати попереднє завдання, базуючись на таблицях `tidy4a` і `tidy4b` з використанням потокового оператора.
+
+
+```{r}
+dplyr::left_join(table4a |> 
+                  gather(`1999`, `2000`, key = "year", value = "cases")
+                 ,table4b |> 
+                   gather(`1999`, `2000`, key = "year", value = "population")) |> 
+  mutate(rate = cases / population * 10000) |> 
+  ggplot(aes(year, rate)) +
+  geom_line(aes(group = country), colour = "white") + 
+  geom_point(aes(colour = country))+
+  theme_dark()
+```
+
+### Spreading
+
+```{r}
+table2
+```
+
+```{r}
+table2 %>%
+    spread(key = type, value = count)
+```
+
+### Separating
+
+```{r}
+table3
+```
+
+```{r}
+table3 %>% 
+  separate(rate, into = c("cases", "population"))
+```
+
+### Uniting
+
+```{r}
+table5
+```
+
+```{r}
+table5 %>% 
+  unite(year, century, year, sep = "")
+```
+
+
+### Пропущені значення
+
+Пропущені значення (__missing value__) у наборах даних можуть бути двох видів: _явні_ (позначені як `NA`, `Not Available`) і _неявні_ (просто не представлені у даних). Такі дані називаються _некомплектні_.   
+Нижче наведено приклад, який це ілюструє.  
+
+```{r}
+stocks <- tibble(
+  year   = c(2015, 2015, 2015, 2015, 2016, 2016, 2016),
+  qtr    = c(   1,    2,    3,    4,    2,    3,    4),
+  return = c(1.88, 0.59, 0.35,   NA, 0.92, 0.17, 2.66)
+)
+stocks
+```
+
+Дані за четвертий квартал 2015 явно відсутні про що свідчить відповідне значення. Дані за перший квартал не внесені у таблицю, тобто відсутні неявно, але відсутність можна помітити після відповідної траснформації.  
+
+```{r}
+stocks %>% 
+  spread(year, return)
+```
+
+Виявити множину некомплектних даних можна також з використанням функції `complete()`.  
+
+```{r}
+stocks %>% 
+  complete(year, qtr)
+```
+
+
+Проблема некомплектних даних вирішується двома шляхами: виключенням некомплектних спостережень, або імпутацією пропущених значень іншими значеннями, виходячи з певної моделі.  
+
+```{r}
+stocks %>% 
+  spread(year, return) %>% 
+  gather(year, return, `2015`:`2016`, na.rm = TRUE)
+```
+
+У випадках, коли це доцільно, можна використовувати функцію `fill()`, яка заповнює пропущенні значення, взявши значення з останньої заповненої клітинки:  
+
+```{r}
+df <- data.frame(Month = 1:12, Year = c(2000, rep(NA, 11)))
+df
+df %>% fill(Year)
+```
+
+### Трансформація
+
+```{r}
+# Вибірка рядків таблиці
+library(dplyr)
+
+starwars %>% 
+  filter(species == "Droid")
+```
+
+```{r}
+# Вибірка полів таблиці
+starwars %>% 
+  select(name, ends_with("color"))
+```
+
+```{r}
+# Створення нового поля у таблиці з послідуючою вибіркою
+starwars %>% 
+  mutate(name, bmi = mass / ((height / 100)  ^ 2)) %>%
+  select(name:mass, bmi)
+```
+
+```{r}
+# Сортування даних
+starwars %>% 
+  arrange(desc(mass))
+```
+
+```{r}
+# Обчислення агрегатів з попереднім групуванням по полю species
+starwars %>%
+  group_by(species) %>%
+  summarise(
+    n = n(),
+    mass = mean(mass, na.rm = TRUE)
+  ) %>%
+  filter(n > 1)
+```
+
+### Індивідуальні завдання на лабораторну роботу
+
+####Динаміку зміни населення України за роками
+
+```{r}
+
+library(rio)
+library(tidyr)
+library(ggplot2)
+
+db <- import("data/ukrpopl.csv")
+country <- db |> 
+  select("Country Name", "1990 [YR1990]":"2023 [YR2023]") |> 
+  gather("1990 [YR1990]":"2023 [YR2023]", key = "year", value = "population")
+country$year <- substr(country$year, 9, nchar(country$year)-1) |> 
+  as.numeric()
+
+country |> 
+  filter(`Country Name` == "Ukraine") |> 
+  ggplot(aes(year, population)) +
+  geom_line(aes(group = `Country Name`), colour = "white") + 
+  geom_point(aes(colour = `Country Name`))+
+  theme_dark()
+```
+
+####Динаміку зміни населення України по кожній області окремо за роками
+
+```{r}
+library(tidyverse)
+library(rvest)
+
+region <- read_html("https://uk.wikipedia.org/wiki/%D0%86%D1%81%D1%82%D0%BE%D1%80%D0%B8%D1%87%D0%BD%D0%B0_%D0%B4%D0%B5%D0%BC%D0%BE%D0%B3%D1%80%D0%B0%D1%84%D1%96%D1%8F_%D0%A3%D0%BA%D1%80%D0%B0%D1%97%D0%BD%D0%B8") |> 
+  html_element(xpath = '//*[@id="mw-content-text"]/div[1]/table[5]') |>
+  html_table() |> gather(рік, населення, `1926`:`2014`) |> subset(grepl("область", регіон))
+
+region <- region |> spread(key = регіон, value = населення) |> 
+  arrange(desc(row_number())) |> 
+  fill(`Вінницька область`:`Чернігівська область`) |> 
+  arrange(desc(row_number())) |> 
+  gather(регіон, населення, `Вінницька область`:`Чернігівська область`)
+
+
+region |> 
+  ggplot(aes(рік, населення)) +
+  geom_line(aes(group = регіон), colour = "white") + 
+  geom_point(aes(colour = регіон))+
+  theme_dark()
+
+
+```
+
+####Динаміку зміни тривалості життя населення України по статі за роками
+
+```{r}
+
+lifetime <- read_html("https://uk.wikipedia.org/wiki/%D0%A2%D1%80%D0%B8%D0%B2%D0%B0%D0%BB%D1%96%D1%81%D1%82%D1%8C_%D0%B6%D0%B8%D1%82%D1%82%D1%8F_%D0%B2_%D0%A3%D0%BA%D1%80%D0%B0%D1%97%D0%BD%D1%96") |> 
+  html_element(xpath = '//*[@id="mw-content-text"]/div[1]/table[4]') |>
+  html_table() |> 
+  gather(Рік, "Тривалість життя", `1950`:`2019`)
+
+colnames(lifetime)[which(names(lifetime) == "")] <- "Стать"
+lifetime$`Тривалість життя` <- parse_number(lifetime$`Тривалість життя`, locale = locale(decimal_mark = ","))
+lifetime$`Рік` <- as.integer(lifetime$`Рік`)
+lifetime |> 
+  ggplot(aes(Рік, `Тривалість життя`)) +
+  geom_line(aes(group = Стать), colour = "white") + 
+  geom_point(aes(colour = Стать))+
+  theme_dark()
+```
+
+####Динаміку зміни народжуваності та смертності населення України за роками.
+
+```{r}
+birthdeath <- import("data/birthdeath.csv")
+
+birthdeath$DateTime <- substr(birthdeath$DateTime, start = 1, stop=4)
+colnames(birthdeath)[which(names(birthdeath) == "DateTime")] <- "Рік"
+birthdeath |> 
+  gather(Тип, Число, Народжених, Померлих) |> 
+  ggplot(aes(Рік, Число)) +
+  geom_line(aes(group = Тип), colour = "white") + 
+  geom_point(aes(colour = Тип))+
+  theme_dark()
+```
+

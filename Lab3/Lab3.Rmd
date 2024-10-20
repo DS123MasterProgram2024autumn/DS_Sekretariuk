@@ -1,0 +1,311 @@
+---
+title: "Лабораторна робота №2. Маніпулювання даними"
+author: "[Секретарюк В. О.](https://github.com/SquireUA), `r format(Sys.time(), '%Y')`"
+date: "`r Sys.Date()`"
+output:
+#   pdf_document:
+#     highlight: tango
+#     toc: yes
+#   word_document:
+#     highlight: tango
+#     toc: yes
+  html_notebook:
+    toc: yes # генерація змісту документу
+    toc_float: true
+    highlight: tango # Колір підсвічування коду
+fontsize: 12pt # розмір шрифту
+header-includes:
+ \usepackage[T2A]{fontenc}
+ \usepackage[utf8]{inputenc}
+editor_options: 
+  chunk_output_type: console # вивід результатів обчислень на консоль
+---
+
+__Мета:__ _Засвоєння принципів, знайомство з інструментами та набуття навичок експлораторного (розвідувального) аналізу даних засобами мови програмування R та колекції пакетів `dplyr`, `ggplot2`, `desctable`, `GGally`, `corrplot`, `PerformanceAnalytics`, `FactoMineR`, `factoextra`, `desctable`, `ade4`, `psych`, `smacof`, `WVPlots`, `caret`, `car`._ 
+
+### Варіація
+
+#### Візуалізація розподілу
+
+```{r}
+library(tidyverse)
+library(ggplot2)
+ggplot(data = diamonds) +
+  geom_bar(mapping = aes(x = cut))
+```
+
+Частоту для кожного значення категоріальної змінної можна обчислита, наприклад, так:
+
+```{r}
+diamonds %>% 
+  count(cut)
+```
+
+Для неперервної змінної доцільно побудувати гістограму:
+
+```{r}
+ggplot(data = diamonds) +
+  geom_histogram(mapping = aes(x = carat), binwidth = 0.5)
+```
+
+Інтервальна таблиця частот, що відповідає гістограмі, може бути обчислена так:
+
+```{r}
+diamonds %>% 
+  count(cut_width(carat, 0.5)) 
+```
+
+Можна побудувати шістограму для певної долі значень:
+
+```{r}
+smaller <- diamonds %>% 
+  filter(carat < 3)
+  
+ggplot(data = smaller, mapping = aes(x = carat)) +
+  geom_histogram(binwidth = 0.1)
+```
+
+Часто буває доцільно поудвати серія гістограм для різних груп спостережень:
+
+```{r}
+ggplot(data = smaller, mapping = aes(x = carat, colour = cut)) +
+  geom_freqpoly(binwidth = 0.1)
+```
+
+####Незвичайні значення
+
+Як правило у вибіркових даних зустірчаються викиди (outliers) – такі значення свідчать або про похибку вимірювання, або про якість надзвичайні причини, що потребують уважного вивчення.
+
+```{r}
+ggplot(diamonds) + 
+  geom_histogram(mapping = aes(x = y), binwidth = 0.5)
+```
+
+Для того, щоб їх побачити, необхідно певним чином масштабувати гістограму:
+
+```{r}
+ggplot(diamonds) + 
+  geom_histogram(mapping = aes(x = y), binwidth = 0.5) +
+  coord_cartesian(ylim = c(0, 50))
+```
+
+Якщо приймається рішення їх видалити, то це можна зроити наступним чином:
+
+```{r}
+unusual <- diamonds %>% 
+  filter(y < 3 | y > 20) %>% 
+  select(price, x, y, z) %>%
+  arrange(y)
+unusual
+```
+
+### Пропущені значення (Missing values)
+
+```{r}
+diamonds
+```
+
+```{r}
+diamonds2 <- diamonds %>% 
+  mutate(y = ifelse(y < 3 | y > 20, NA, y))
+
+ggplot(data = diamonds2, mapping = aes(x = x, y = y)) + 
+  geom_point()
+```
+
+Інколи ми хочемо зрозуміти, що робить спостереження з відсутніми значеннями, відмінними від спостережень із записаними значеннями. Наприклад, у `nycflights13::flights`, відсутні значення в змінній `dep_time` (час вильоту) показують, що рейс був скасований. Тому, можливо, нам потрібно буде порівняти заплановані терміни вильоту для скасованих та не скасованих часів. Ми можемо зробити це, зробивши нову змінну з `is.na()`:
+
+```{r}
+nycflights13::flights %>% 
+  mutate(
+    cancelled = is.na(dep_time),
+    sched_hour = sched_dep_time %/% 100,
+    sched_min = sched_dep_time %% 100,
+    sched_dep_time = sched_hour + sched_min / 60
+  ) %>% 
+  ggplot(mapping = aes(sched_dep_time)) + 
+    geom_freqpoly(mapping = aes(colour = cancelled), binwidth = 1/4)
+```
+
+### Коваріація
+
+####  Категоріальні та неперервні змінні
+
+```{r}
+ggplot(data = diamonds, mapping = aes(x = price)) + 
+  geom_freqpoly(mapping = aes(colour = cut), binwidth = 500)
+```
+
+Важко побачити різницю в розподілах, оскільки кількість вибіркових значень у кожній групі суттєво відрізняється:
+
+```{r}
+ggplot(diamonds) + 
+  geom_bar(mapping = aes(x = cut))
+```
+
+Для полегшення порівняння нам потрібно поміняти те, що відображається на осі `Y`. Замість того, щоб відображати частоту, ми покажемо відносну частоту, яка є нормованою величиною.
+
+```{r}
+ggplot(data = diamonds, mapping = aes(x = price, y = ..density..)) + 
+  geom_freqpoly(mapping = aes(colour = cut), binwidth = 500)
+```
+
+Тоді для нашого випадку застосування боксплотів дасть такий результат:
+
+```{r}
+ggplot(data = diamonds, mapping = aes(x = cut, y = price)) +
+  geom_boxplot()
+```
+
+#### Дві категоріальні змінні
+
+Для візуалізації коваріації між категоріальними змінними неохідно візуалізувати частоти: у вигляді таблиці, або певного графічного візуалізатора. Наприклад:
+
+```{r}
+ggplot(data = diamonds) +
+  geom_count(mapping = aes(x = cut, y = color))
+```
+
+З результатів видно, що існує певна залежність між кольором діаманта, та якістю його ограненості.
+
+### Індивідуальні завдання на лабораторну роботу
+
+Дані з досліджуваного набору мають наступний вигляд:
+
+```{r}
+library(rio)
+
+hw <- import("data/hw.xlsx")
+
+head(hw)
+```
+
+Обчислимо і дослідимо сумарні статистики.
+
+```{r}
+hw |> 
+  summary() 
+```
+
+Що ми бачимо?
+
+- зріст і вага мають числову природу, стать - знакову
+- дані комплектні: відстуні пропущені значення
+- відсутні нульові значення – це знімає можливі проблеми при трансформації
+- відсутні надвелики значення – надвелики значення кожен раз потребують серйозної уваги і аналізу - - - можливих причин, що їх викликали
+
+Дослідимо закони розподілу ваги та зросту. Для цього побудуємо серію гістограм для них: 
+
+```{r}
+# Побудова 4x4 матриці гістограм і щільності нормального розподілу з відносними частками
+hw |>
+  pivot_longer(cols = -Стать) |>
+  ggplot(aes(x = value)) +
+  geom_histogram(binwidth = 2, 
+                 fill = "lightblue", 
+                 color = "dark grey", 
+                 aes(y = after_stat(density))) +
+  geom_density(aes(y = after_stat(density)), color = "red") +
+  facet_wrap(~name, scales = "free") +
+  theme_minimal() +
+  labs(x = "Значення", y = "Відносна частота")
+```
+
+Що ми бачимо?
+
+- зріст має дзвоноподібну форму, наближену до нормального. Враховуючи, що значення оцінок асимметрії та ексцесу несуттєво відрізняються від нуля, в першому наближенні можна вважати дані розподіли нормальними.
+- вага сильно здвинута ліворуч, що говорить про можливу недостовірність даних, які вище 120
+
+Подивимся на дані ваги більше 120
+```{r}
+hw |> 
+  filter(`Вага, кг` > 120) |> 
+  head()
+```
+
+Бачино лише 2 записи. Спробуємо ними знехтувати
+
+```{r}
+hwnew <- hw |>
+  filter(`Вага, кг` < 120)
+hwnew |> 
+  select(-`Зріст, см`) |> 
+  pivot_longer(cols = -Стать) |>
+  ggplot(aes(x = value)) +
+  geom_histogram(binwidth = 2, 
+                 fill = "lightblue", 
+                 color = "dark grey", 
+                 aes(y = after_stat(density))) +
+  geom_density(aes(y = after_stat(density)), color = "red") +
+  facet_wrap(~name, scales = "free") +
+  theme_minimal() +
+  labs(x = "Значення", y = "Відносна частота")
+```
+
+Гістограма все ще трохи здвинета ліворуч, але вже краще
+
+Для відповіді на питання, чи пов’язані між собою змінні, застосуємо кореляційний аналіз. З урахуванням числової природи даних, для оцінки кореляції скористаємося коефіцієнтом кореляції Пірсона.
+
+```{r}
+# pairs(iris[1:4], main="Edgar Anderson's Iris Data", font.main=4, pch=19)
+
+hwnew |>
+  select(-Стать) |> 
+  pairs( main="Edgar Anderson's Iris Data", font.main = 2, pch = 19)
+```
+
+Що ми бачимо?
+
+- між зростом і вагою є позетивний кореляційний зв'язок
+- не видно поділу даних по статі
+
+```{r}
+hwnew |> 
+  select(-Стать) |> 
+  cor() |> 
+  knitr::kable(caption = "Таблиця кореляції") 
+```
+
+```{r}
+# PCA 
+#install.packages("FactoMineR")
+# Load
+#library("FactoMineR")
+resPCA <- hw |> 
+  select(-Стать) |>
+  PCA(ncp = 8, graph = FALSE)
+
+# власні значення та кумулятивний процент
+eigenvalues <- as.data.frame(resPCA$eig)
+cumVar <- round(eigenvalues$`cumulative percentage of variance`[length(eigenvalues$eigenvalue[eigenvalues$eigenvalue >= 0.9])], 2)
+
+knitr::kable(
+  eigenvalues, 
+  caption = "Власні значення (eigenvalues) і сумарний процент поясненої дисперсії"
+)
+```
+
+```{r}
+#install.packages("devtools")
+#library("devtools")
+#install_github("kassambara/factoextra")
+library("factoextra")
+fviz_pca_biplot(resPCA,
+                geom = c("point"),
+                # label = "none", # hide individual labels
+             habillage = as.factor(hw$Стать), # color by groups
+             axes = c(1, 2),
+             repel = TRUE,
+             label = c("ind", "ind.sup", "quali", "var", "quanti.sup"),
+             select.var = list(name = c("Sepal.Length", "Sepal.Width", "Petal.Length", "Petal.Width")),
+             # select.var = list(contrib = 8),
+             # label = c("ind.sup"),
+             palette = c("#00AFBB", "#E7B800", "#FC4E07", "#00AFBB", "#E7B800", "#FC4E07"),
+             # alpha.var = c("contrib"),
+             # col.ind = c("contrib"),
+             # col.ind.sup = c("contrib"),
+             addEllipses = TRUE # Concentration ellipses
+             ) +
+  theme_minimal()
+```
+
