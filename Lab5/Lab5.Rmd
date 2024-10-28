@@ -1,0 +1,137 @@
+---
+title: "Лабораторна робота №5. Побудова регресійних моделей"
+author: "[Секретарюк В. О.](https://github.com/SquireUA), `r format(Sys.time(), '%Y')`"
+date: "`r Sys.Date()`"
+output:
+#   pdf_document:
+#     highlight: tango
+#     toc: yes
+#   word_document:
+#     highlight: tango
+#     toc: yes
+  html_notebook:
+    toc: yes # генерація змісту документу
+    toc_float: true
+    highlight: tango # Колір підсвічування коду
+fontsize: 12pt # розмір шрифту
+header-includes:
+ \usepackage[T2A]{fontenc}
+ \usepackage[utf8]{inputenc}
+editor_options: 
+  chunk_output_type: console # вивід результатів обчислень на консоль
+---
+
+__Мета:__ _Засвоєння базових принципів, знайомство з інструментами та набуття навичок побудови моделей регресії на рівні технології на основи статистичного підходу та моделей машинного навчання засобами мови програмування R та колекції пакетів `dplyr`, `ggplot2`._ 
+
+
+### Індивідуальні завдання на лабораторну роботу
+
+
+
+```{r}
+library(rio)
+
+hw <- import("data/hw.xlsx")
+
+head(hw)
+```
+
+```{r}
+library(tidyverse)
+library(ggplot2)
+library(dplyr)
+hww <- hw |> 
+  filter(Стать == 'Woman')
+```
+```{r}
+hww %>%
+  select(-Стать) %>% 
+  cor() %>% 
+  knitr::kable(caption = "Таблиця оцінок коефіцієнтів кореляції")
+```
+
+```{r}
+hww %>%
+  select(-Стать) %>% 
+  pairs()
+```
+
+```{r}
+hwwNotFilter <- hww |> 
+  select(-Стать)
+
+lm.heigh <- lm(`Вага, кг`~.,data = hwwNotFilter)
+summary(lm.heigh)
+```
+```{r}
+plot(lm.heigh)
+```
+
+```{r}
+hwwFilter <- hww %>%
+  filter((rownames(hww) == '20') != TRUE & (rownames(hww) == '56') != TRUE) %>% 
+  select(-Стать)
+
+
+lm.heigh <- lm(`Вага, кг`~.,data = hwwFilter)
+summary(lm.heigh)
+```
+
+
+
+```{r}
+plot(lm.heigh)
+```
+
+```{r}
+ggplot(hwwFilter,
+       aes(y =`Вага, кг`, x = `Зріст, см`)) +
+  labs(title = "Залежність зросту від маси",
+       y = "Вага, кг", x = "Зріст, см") +
+  geom_point() +
+  stat_smooth(method=lm, se = TRUE, fullrange = TRUE) 
+```
+
+
+#### Побудова моделі `random forest`.
+
+```{r}
+# 80% даних використовуємо для тренування моделі, 20% для тестування
+colnames(hwwFilter) <- c("height", "weight")
+
+split <- sample(2, nrow(hwwFilter), replace=TRUE, prob=c(0.8, 0.2))
+train <- hwwFilter[split==1,]
+test <- hwwFilter[split==2,]
+
+#install.packages("randomForest")
+library(randomForest)
+
+# Побудова моделі
+# rf <- randomForest(reach ~ ., data = train)
+rf <- randomForest(weight ~.,data = train, scale=FALSE, ntree=500)
+rf
+```
+
+```{r}
+# Побудова прогнозу на тестовій вибірці
+predictions <- predict(rf, test)
+
+# ПОхибка прогнозу
+print(sqrt(sum((as.vector(predictions - test$weight))^2))/length(predictions))
+```
+
+```{r}
+# Графік похибки прогнозу
+plot(rf)
+```
+
+```{r}
+# Оцінка важливості предикторів
+importance(rf)
+```
+
+
+
+
+
+

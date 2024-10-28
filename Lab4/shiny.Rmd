@@ -1,0 +1,20 @@
+---
+title: "ShinyApp"
+author: "[Секретарюк В. О.](https://github.com/SquireUA), `r format(Sys.time(), '%Y')`"
+date: "`r Sys.Date()`"
+output: flexdashboard::flex_dashboard
+---
+
+```{r setup, include = FALSE}
+#install.packages("flexdashboard")
+#install.packages("shiny")
+library(ggplot2)
+library(dplyr)
+library(shiny)
+knitr::opts_chunk$set(fig.width = 5, fig.asp = 1/3)
+
+```
+
+```{r}
+runApp("my_app.R")
+```

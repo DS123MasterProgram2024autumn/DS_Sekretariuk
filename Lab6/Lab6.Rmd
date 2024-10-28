@@ -1,0 +1,94 @@
+---
+title: "Лабораторна робота №6. Побудова моделей класифікації"
+author: "[Секретарюк В. О.](https://github.com/SquireUA), `r format(Sys.time(), '%Y')`"
+date: "`r Sys.Date()`"
+output:
+#   pdf_document:
+#     highlight: tango
+#     toc: yes
+#   word_document:
+#     highlight: tango
+#     toc: yes
+  html_notebook:
+    toc: yes # генерація змісту документу
+    toc_float: true
+    highlight: tango # Колір підсвічування коду
+fontsize: 12pt # розмір шрифту
+header-includes:
+ \usepackage[T2A]{fontenc}
+ \usepackage[utf8]{inputenc}
+editor_options: 
+  chunk_output_type: console # вивід результатів обчислень на консоль
+---
+
+__Мета:__ _Засвоєння базових принципів, знайомство з інструментами та набуття навичок побудови, eкспорту та імпорту моделей класифікації на рівні технології на основі статистичного підходу та моделей машинного навчання засобами мови програмування R та за допомогою універсального інтерфейсу доступа до функцій машинного навчання пакета `caret`._ 
+
+### Індивідуальні завдання на лабораторну роботу
+
+```{r}
+library(rio)
+
+hw <- import("data/hw.xlsx")
+
+head(hw)
+```
+
+```{r}
+
+#install.packages("caret")
+library(caret)
+
+
+# Розділяємо дані на навчальну та тестову вибірки.
+
+set.seed(1234)
+
+trainIndex <- createDataPartition(1:nrow(hw), times = 1, p = .8) #знаємо (1)
+
+trainSet  <- hw[trainIndex$Resample1,]
+testSet   <- hw[-trainIndex$Resample1,]
+
+# Керування навчанням
+
+fitCtrl <- trainControl(method = "repeatedcv",  # Кросс-валідація
+                        number = 10,            # дані розбиваються на 10 частин
+                        repeats = 5             # число повторень
+)
+
+# Навчання класиифікації за методом лінійного дискримінантного аналіза
+
+model <- train(trainSet[,-3],trainSet[,3],
+               method = 'lda',
+               trControl = fitCtrl
+)
+
+# Навчена модель, яку має бути збережено:
+
+#str(model)
+
+fit <- model$finalModel
+#str(fit)
+```
+
+
+```{r}
+# Трансформуємо модель у набір символів
+
+fit_char <- rawToChar(serialize(fit, NULL, TRUE))
+nchar(fit_char) # скільки там символів?
+```
+
+```{r}
+class(fit)
+```
+
+```{r}
+# Виконуємо класифікацію за допомогою відновленої моделі.
+
+prediction <- predict(fit, newdata = testSet[,-3])
+
+# Перервіряємо якість класифікації.
+confusionMatrix(prediction$class, as.factor(testSet[,3]))
+```
+
+
