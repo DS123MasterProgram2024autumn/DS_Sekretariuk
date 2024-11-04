@@ -43,6 +43,7 @@ library(dplyr)
 hww <- hw |> 
   filter(Стать == 'Woman')
 ```
+
 ```{r}
 hww %>%
   select(-Стать) %>% 

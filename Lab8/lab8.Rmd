@@ -1,0 +1,205 @@
+---
+title: "Лабораторна робота №8. Побудова ARIMA-моделі часового ряду і прогнозування на її основі (short version)"
+author: "[Секретарюк В. О.](https://github.com/SquireUA), `r format(Sys.time(), '%Y')`"
+date: "`r Sys.Date()`"
+output:
+#   pdf_document:
+#     highlight: tango
+#     toc: yes
+#   word_document:
+#     highlight: tango
+#     toc: yes
+  html_notebook:
+    toc: yes # генерація змісту документу
+    toc_float: true
+    highlight: tango # Колір підсвічування коду
+fontsize: 12pt # розмір шрифту
+header-includes:
+ \usepackage[T2A]{fontenc}
+ \usepackage[utf8]{inputenc}
+editor_options: 
+  chunk_output_type: console # вивід результатів обчислень на консоль
+---
+
+__Мета:__ _Подубова ARIMA-моделей та прогнозування на їх основі засобами мови програмування R._ 
+
+### Динаміку щоквартальних процентних змін у споживчих витратах США.
+
+```{r}
+#install.packages("fpp2")
+#install.packages("forecast")
+library(ggplot2)
+library(fpp2)
+library(forecast)
+
+fit <- uschange[,"Consumption"]
+
+autoplot(fit) +
+  xlab("Year") + ylab("Quarterly percentage change")
+```
+
+ЧАКФ
+```{r}
+
+
+fit |> 
+  ggPacf()
+```
+
+АКФ
+```{r}
+fit |> 
+  ggAcf()
+```
+
+AR(1)
+
+```{r}
+
+
+(fit2 <- Arima(uschange[,"Consumption"], order=c(1,0,0)))
+
+fit2 %>% 
+  forecast(h=10) %>% 
+  autoplot(include=80)
+```
+
+MA(1)
+
+```{r}
+(fit3 <- Arima(uschange[,"Consumption"], order=c(0,0,1)))
+
+fit3 %>% 
+  forecast(h=10) %>% 
+  autoplot(include=80)
+```
+
+Модель, знайдена автоматичною процедурою(AR(1), MA(3))
+```{r}
+(fit4 <- auto.arima(uschange[,"Consumption"], seasonal=FALSE))
+
+fit4 %>% 
+  forecast(h=10) %>% 
+  autoplot(include=80)
+```
+
+Автоматична процедура вибрала AR(1) через один значний лаг в ЧАКФ і MA(3) через три значні лаги в АКФ
+
+AR(2), MA(2)
+```{r}
+(fit5 <- Arima(uschange[,"Consumption"], order=c(2,0,2)))
+
+fit5 %>% 
+  forecast(h=10) %>% 
+  autoplot(include=80)
+```
+
+Я вважаю AR(2), MA(2) хорошою моделю, тому що всі її значення()
+
+#### Динаміку щорічної кількості випадків чоловічого безпліддя в Україні за наявний період.
+
+```{r}
+library(rio)
+library(dplyr)
+
+
+barrenness <- import("data/infertility.xlsx")
+
+mb <- barrenness |> 
+  filter(`Стать` == 'ч') |> 
+  select(-Стать)
+
+
+mb2 <- data.frame(t(mb[-1]))
+colnames(mb2) <- mb[, 1]
+
+mb2.sum <-apply(mb2,1,sum)
+
+mb3 <-cbind(mb2,mb2.sum)
+
+colnames(mb3)[28] ="Україна"
+
+tsmb <- ts(mb3 |> select(Україна), start=1993)
+
+autoplot(tsmb)
+```
+
+Після 2005 року бачимо тенденцію на зростання випадків чоловічого безпліддя
+
+```{r}
+tsmb |> 
+  ggPacf()
+```
+
+На ЧАКФ бачимо один значний лаг
+
+```{r}
+tsmb |> 
+  ggAcf()
+```
+
+АКФ пказує нам тенденцію, яка швидко спадає
+
+Продиференцюємо числовий ряд і подивимся на ЧАКФ і АКФ 
+
+```{r}
+tsmb.d <- tsmb |> 
+  diff()
+
+tsmb.d |> 
+  autoplot()
+```
+
+```{r}
+tsmb.d |> 
+  ggPacf()
+```
+
+```{r}
+tsmb.d |> 
+  ggAcf()
+```
+
+#### Будуємо ARIMA моделі
+
+ARIMA(1,0,0)
+
+```{r}
+(fit1 <- Arima(tsmb, order=c(1,0,0)))
+```
+
+ARIMA(0,0,1)
+
+```{r}
+(fit2 <- Arima(tsmb, order=c(0,0,1)))
+```
+
+ARIMA(1,1,0)
+
+```{r}
+(fit3 <- Arima(tsmb.d, order=c(1,0,0)))
+```
+
+ARIMA(0,1,1)
+
+```{r}
+(fit4 <- Arima(tsmb.d, order=c(0,0,1)))
+```
+
+ARIMA(1,1,1)
+
+```{r}
+(fit5 <- Arima(tsmb.d, order=c(1,0,1)))
+```
+
+Вибираємо ARIMA(1,1,1) через два значющіх показника ar1 та ma1
+
+#### Будуємо прогнози на 3 рози вперед
+
+```{r}
+fit5 %>% 
+  forecast(h=3) %>% 
+  autoplot()
+```
+
+
